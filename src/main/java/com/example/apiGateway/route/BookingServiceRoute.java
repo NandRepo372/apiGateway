@@ -1,13 +1,17 @@
 package com.example.apiGateway.route;
 
 
+import org.springframework.cloud.gateway.server.mvc.filter.CircuitBreakerFilterFunctions;
 import org.springframework.cloud.gateway.server.mvc.handler.GatewayRouterFunctions;
 import org.springframework.cloud.gateway.server.mvc.handler.HandlerFunctions;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.servlet.function.RequestPredicates;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerResponse;
+
+import java.net.URI;
 
 @Configuration
 public class BookingServiceRoute {
@@ -18,6 +22,27 @@ public class BookingServiceRoute {
                 .route("booking-service")
                 .route(RequestPredicates.POST("/api/v1/booking"),
                         HandlerFunctions.http("http://localhost:8081/api/v1/booking"))
+                .filter(CircuitBreakerFilterFunctions.circuitBreaker("BookingServiceCircuitBreaker", URI.create("forward://fallbackRoute")))
                 .build();
     }
+
+    @Bean
+    public RouterFunction<ServerResponse> fallbackRoute() {
+        return GatewayRouterFunctions.route("booking-service-fallback")
+                        .POST("/fallbackRoute"
+                        , request -> ServerResponse.status(HttpStatus.SERVICE_UNAVAILABLE).
+                                body("Booking Service is currently unavailable. Please try again later."))
+                .build();
+    }
+
+    @Bean
+    public RouterFunction<ServerResponse> bookingServiceApiDocs(){
+        return  GatewayRouterFunctions
+                .route("booking-service-api-docs")
+                .GET("docs/inventoryServices/v3/api-docs",
+                        HandlerFunctions.http("http://localhost:8081/v3/api-docs"))
+                .build();
+    }
+
+
 }
